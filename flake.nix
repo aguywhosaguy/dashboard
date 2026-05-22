@@ -1,23 +1,34 @@
-# Run with `nix-shell shell.nix`
-let
-  pkgs = import <nixpkgs> { };
-in
-pkgs.mkShell {
-  nativeBuildInputs = with pkgs; [
-    pkg-config
-    wrapGAppsHook4
-    cargo 
-    cargo-tauri # Optional, Only needed if Tauri doesn't work through the traditional way.
-    nodejs # Optional, this is for if you have a js frontend
-    rustc # Needed for dev server (npm tauri dev)
-  ];
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
+  };
 
-  buildInputs = with pkgs; [
-    librsvg
-    webkitgtk_4_1
-  ];
+  outputs = { self, nixpkgs }: 
+  let
+    system = "x86_64-linux";
+    pkgs = nixpkgs.legacyPackages.${system};
+  in {
+    devShells.${system}.default = pkgs.mkShell {
+      nativeBuildInputs = with pkgs; [
+        bun
+        zsh
+        pkg-config
+        wrapGAppsHook4
+        cargo
+        cargo-tauri
+        nodejs
+        rustc
+      ];
 
-  shellHook = ''
-    export XDG_DATA_DIRS="$GSETTINGS_SCHEMAS_PATH" # Needed on Wayland to report the correct display scale
-  '';
+      buildInputs = with pkgs; [
+        librsvg
+        webkitgtk_4_1
+      ];
+
+      shellHook = ''
+        export XDG_DATA_DIRS="$GSETTINGS_SCHEMAS_PATH"
+        exec zsh
+      '';
+    };
+  };
 }
