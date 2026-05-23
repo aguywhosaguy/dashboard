@@ -23,6 +23,7 @@
       buildInputs = with pkgs; [
         librsvg
         webkitgtk_4_1
+        xdg-utils
       ];
 
       shellHook = ''
