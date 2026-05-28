@@ -18,6 +18,7 @@
         cargo-tauri
         nodejs
         rustc
+        typescript-language-server
       ];
 
       buildInputs = with pkgs; [
