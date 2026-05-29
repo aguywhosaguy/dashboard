@@ -1,33 +1,52 @@
 mod google;
 
 use anyhow::{Context, Result};
+use chrono::{Local, Weekday};
+use rand::seq::IndexedRandom;
+use reqwest::Method;
+use serde::{Deserialize, Serialize};
+use specta_typescript::Typescript;
 use std::fs;
+use tauri::Manager;
+use tauri_specta::{collect_commands, Builder};
 
 use dotenvy::dotenv;
-use rand::seq::IndexedRandom;
 
 use crate::google::GoogleClient;
 
-struct AppError(anyhow::Error);
-
-impl serde::Serialize for AppError {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.0.to_string())
-    }
-}
+#[derive(Serialize, specta::Type)]
+struct AppError(String);
 
 impl From<anyhow::Error> for AppError {
     fn from(e: anyhow::Error) -> Self {
-        AppError(e)
+        AppError(e.to_string())
     }
 }
 
 type CmdResult<T> = Result<T, AppError>;
 
+#[derive(Serialize, Deserialize, specta::Type)]
+struct GoogleDate {
+    date: String,
+}
+
+#[derive(Serialize, Deserialize, specta::Type)]
+struct GoogleEvent {
+    summary: String,
+    description: String,
+    id: String,
+    start: GoogleDate,
+    end: GoogleDate,
+    htmlLink: String,
+}
+
+#[derive(Serialize, Deserialize, specta::Type)]
+struct GoogleEventList {
+    items: Vec<GoogleEvent>,
+}
+
 #[tauri::command]
+#[specta::specta]
 fn get_rand_photo(folder: &str) -> CmdResult<String> {
     let entries: Vec<_> = fs::read_dir(folder)
         .context("Failed to read dir")?
@@ -49,9 +68,63 @@ fn get_rand_photo(folder: &str) -> CmdResult<String> {
         .map_err(AppError::from)
 }
 
+#[tauri::command]
+#[specta::specta]
+async fn get_events(calendar: &str, app: tauri::AppHandle) -> CmdResult<GoogleEventList> {
+    let client = app.state::<GoogleClient>();
+
+    let week = Local::now().date_naive().week(Weekday::Sun);
+
+    let sunday: String = week
+        .first_day()
+        .and_hms_opt(0, 0, 0)
+        .context("Failed to calculate start")?
+        .and_local_timezone(Local)
+        .single()
+        .context("Failed to get timezone")?
+        .to_rfc3339();
+
+    let saturday: String = week
+        .last_day()
+        .and_hms_opt(23, 59, 59)
+        .context("Failed to calculate end")?
+        .and_local_timezone(Local)
+        .single()
+        .context("Failed to get timezone")?
+        .to_rfc3339();
+
+    let response = client
+        .request(
+            Method::GET,
+            format!(
+                "https://www.googleapis.com/calendar/v3/calendars/{}/events",
+                calendar
+            )
+            .as_str(),
+        )
+        .await?
+        .query(&[("timeMin", sunday), ("timeMax", saturday)])
+        .send()
+        .await
+        .context("Failed to send request")?;
+
+    let events: GoogleEventList = response.json().await.context("Failed to parse response")?;
+
+    Ok(events)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     dotenv().ok();
+    let mut builder =
+        Builder::<tauri::Wry>::new().commands(collect_commands![get_rand_photo, get_events]);
+
+    builder
+        .export(
+            Typescript::default(),
+            "/home/henryw/projects/dashboard/src/bindings.ts",
+        )
+        .expect("Failed to export typescript bindings");
 
     tauri::Builder::default()
         .manage(GoogleClient::new(
@@ -60,7 +133,7 @@ pub fn run() {
             std::env::var("REFRESH_TOKEN").expect("Refresh Token env var not found"),
         ))
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![get_rand_photo])
+        .invoke_handler(builder.invoke_handler())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

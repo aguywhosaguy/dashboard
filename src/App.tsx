@@ -1,12 +1,19 @@
 import { createSignal, For, onMount } from "solid-js";
+import { commands, GoogleEvent, GoogleEventList } from "./bindings";
 import "./App.css";
-import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { convertFileSrc } from "@tauri-apps/api/core";
 
 function App() {
   const [path, setPath] = createSignal("");
 
+  const [events, setEvents] = createSignal<GoogleEventList>();
+
   onMount(async () => {
     setPath(await getRandomWallpaper())
+
+    const vents = await commands.getEvents('primary')
+    
+    setEvents(vents.status == "ok" ? vents.data : undefined)
   })
 
 
@@ -24,11 +31,12 @@ function App() {
   }
 
   async function getRandomWallpaper(): Promise<string> {
-    let path: string = await invoke('get_rand_photo', {folder: '/home/henryw/wallpapers/'})
+    let path = await commands.getRandPhoto('/home/henryw/wallpapers/');
 
-    path = convertFileSrc(path);
 
-    return path
+    let imgpath = convertFileSrc(path.status == "ok" ? path.data : "");
+
+    return imgpath
   }
   
   return (
@@ -38,6 +46,11 @@ function App() {
           {(item, _) => (
             <div class="flex-col border h-full grow p-2">
               <p class="justify-start">{item.getDate()}</p>
+              <For each={events()?.items.filter((event: GoogleEvent) => new Date(event.start.date).getDate() == item.getDate())}>
+                {(event, _) => (
+                  <a href={event.htmlLink}>{event.summary}</a>
+                )}
+              </For>
             </div>  
           )}
         </For>
