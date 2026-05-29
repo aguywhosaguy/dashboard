@@ -1,4 +1,4 @@
-import { createSignal, For, onMount } from "solid-js";
+import { createSignal, For, onCleanup, onMount } from "solid-js";
 import clsx from "clsx";
 import { commands, GoogleEvent } from "./bindings";
 import "./App.css";
@@ -12,9 +12,24 @@ function App() {
   const [events, setEvents] = createSignal<GoogleEvent[]>([]);
 
   onMount(async () => {
-    setPath(await getRandomWallpaper())
+    refreshWallpaper()
 
     refreshEvents()
+
+    const handles: Record<string, () => Promise<void>> = {
+      'p': refreshWallpaper,
+      'r': refreshEvents,
+    }
+
+    const handler = (e: KeyboardEvent) => {
+      if (handles[e.key]) {
+        handles[e.key]()
+      }
+    }
+
+    window.addEventListener("keydown", handler)
+
+    onCleanup(() => window.removeEventListener("keydown", handler))
   })
 
 
@@ -34,7 +49,7 @@ function App() {
  async function refreshEvents() {
     const vents = await commands.getEvents(CALENDAR);
 
-    if (vents.status == 'error') {
+    if (vents.status === 'error') {
       console.error(vents.error)
       return
     }
@@ -42,13 +57,16 @@ function App() {
     setEvents(vents.data.items)
   }
 
-  async function getRandomWallpaper(): Promise<string> {
+  async function refreshWallpaper() {
     let path = await commands.getRandPhoto('/home/henryw/wallpapers/');
 
+    if (path.status === 'error') {
+      console.error(path.error)
+      return
+    }
 
-    let imgpath = convertFileSrc(path.status == "ok" ? path.data : "");
+    setPath(convertFileSrc(path.data))
 
-    return imgpath
   }
 
   const dayEvents = (date: Date) => 
@@ -84,18 +102,18 @@ function App() {
         </For>
       </div>
       <div class="flex h-3/4 full">
-        <div class="h-full grow min-w-1/4 border">
+        <div class="h-full w-1/4 border">
           Taskas 
         </div> 
-        <div class="flex-col h-full border">
-          <div class="flex h-2/3 aspect-video border">
+        <div class="flex-col h-full grow border">
+          <div class="flex h-2/3 aspect-video mx-auto">
             <img class="h-full w-full" src={path()} />
           </div> 
           <div class="flex h-1/3 w-full border">
             Waether
           </div>
         </div> 
-        <div class="h-full grow min-w-1/4 border">
+        <div class="h-full w-1/4 border">
           HABITS 
         </div> 
       </div>

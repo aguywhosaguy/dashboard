@@ -1,6 +1,6 @@
 mod google;
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, anyhow};
 use chrono::{Local, Weekday};
 use rand::seq::IndexedRandom;
 use reqwest::Method;
@@ -27,13 +27,14 @@ type CmdResult<T> = Result<T, AppError>;
 
 #[derive(Serialize, Deserialize, specta::Type)]
 struct GoogleDate {
-    date: String,
+    date: Option<String>,
+    dateTime: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, specta::Type)]
 struct GoogleEvent {
     summary: String,
-    description: String,
+    description: Option<String>,
     id: String,
     start: GoogleDate,
     end: GoogleDate,
@@ -108,8 +109,16 @@ async fn get_events(calendar: &str, app: tauri::AppHandle) -> CmdResult<GoogleEv
         .await
         .context("Failed to send request")?;
 
-    let events: GoogleEventList = response.json().await.context("Failed to parse response")?;
+    println!("{}", response.url());
+    
+    let text = response.text().await.context("Failed to get response text")?;
 
+    println!("{}", text);
+
+    let events: GoogleEventList = serde_json::from_str(&text).map_err(|e| anyhow!(e))?;
+
+    //let events: GoogleEventList = response.json().await.context("Failed to parse response")?;
+    
     Ok(events)
 }
 
