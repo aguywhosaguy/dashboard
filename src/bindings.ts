@@ -34,8 +34,8 @@ async getEvents(calendar: string) : Promise<Result<GoogleEventList, AppError>> {
 /** user-defined types **/
 
 export type AppError = string
-export type GoogleDate = { date: string }
-export type GoogleEvent = { summary: string; description: string; id: string; start: GoogleDate; end: GoogleDate; htmlLink: string }
+export type GoogleDate = { date: string | null; dateTime: string | null }
+export type GoogleEvent = { summary: string; description: string | null; id: string; start: GoogleDate; end: GoogleDate; htmlLink: string }
 export type GoogleEventList = { items: GoogleEvent[] }
 
 /** tauri-specta globals **/
