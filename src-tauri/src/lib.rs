@@ -1,6 +1,8 @@
+mod config;
 mod google;
+mod store;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use chrono::{Local, Weekday};
 use rand::seq::IndexedRandom;
 use reqwest::Method;
@@ -58,7 +60,9 @@ async fn get_all_events(app: tauri::AppHandle) -> CmdResult<Vec<GoogleEvent>> {
     let mut events: Vec<GoogleEvent> = Vec::new();
 
     for calendar in &calendars {
-        let cevents = client.get_events(urlencoding::encode(&calendar.id).into_owned().as_str()).await?;
+        let cevents = client
+            .get_events(urlencoding::encode(&calendar.id).into_owned().as_str())
+            .await?;
 
         events.extend(cevents);
     }
@@ -73,7 +77,6 @@ async fn get_colors(app: tauri::AppHandle) -> CmdResult<GoogleColorList> {
 
     Ok(client.get_colors().await?)
 }
-
 
 #[tauri::command]
 #[specta::specta]
@@ -102,8 +105,14 @@ async fn set_task(app: tauri::AppHandle, task: GoogleTask) -> CmdResult<GoogleTa
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     dotenv().ok();
-    let mut builder =
-        Builder::<tauri::Wry>::new().commands(collect_commands![get_rand_photo, get_all_events, get_colors, get_tasklists, get_tasks, set_task]);
+    let mut builder = Builder::<tauri::Wry>::new().commands(collect_commands![
+        get_rand_photo,
+        get_all_events,
+        get_colors,
+        get_tasklists,
+        get_tasks,
+        set_task
+    ]);
 
     builder
         .export(
@@ -116,7 +125,7 @@ pub fn run() {
         .manage(GoogleClient::new(
             std::env::var("CLIENT_ID").expect("Client ID env var not found"),
             std::env::var("CLIENT_SECRET").expect("Client secret env var not found"),
-            std::env::var("REFRESH_TOKEN").expect("Refresh Token env var not found"),
+            config::get_config().unwrap().refresh_token,
         ))
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(builder.invoke_handler())

@@ -1,16 +1,18 @@
 import { createEffect, createResource, createSignal, For, onCleanup, onMount } from "solid-js";
 import clsx from "clsx";
-import { commands, GoogleColorList, GoogleEvent, GoogleTask, GoogleTasklist } from "./bindings";
+import { commands, GoogleColorList, GoogleDate, GoogleEvent, GoogleTask, GoogleTasklist } from "./bindings";
 import "./App.css";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { createStore } from "solid-js/store";
+
+type GoogleEventHelper = GoogleEvent & {startDate: Date, endDate: Date}
 
 function App() {
   const [path, setPath] = createSignal("");
 
   const [colors, setColors] = createSignal<GoogleColorList>();
 
-  const [events, setEvents] = createSignal<GoogleEvent[]>([]);
+  const [events, setEvents] = createSignal<GoogleEventHelper[]>([]);
 
   const [tasklists, setTasklists] = createSignal<GoogleTasklist[]>([])
 
@@ -73,13 +75,20 @@ function App() {
 
  async function refreshEvents() {
     const vents = await commands.getAllEvents();
+    const getDate = (date: GoogleDate) => new Date(date.dateTime ?? date.date ?? 2000) 
 
     if (vents.status === 'error') {
       console.error(vents.error)
       return
     }
 
-    setEvents(vents.data)
+    const newEvents: GoogleEventHelper[] = vents.data.map(vent => ({
+      ...vent,
+      startDate: getDate(vent.start),
+      endDate: getDate(vent.end)
+    }))
+
+    setEvents(newEvents)
   }
 
  async function refreshTasklists() {
@@ -107,15 +116,12 @@ function App() {
 
   }
 
+
   const dayEvents = (date: Date) => 
     events()
     .filter(
-      (event: GoogleEvent) => 
-        new Date(
-          event.start.dateTime 
-            ?? event.start.date 
-            ?? 2000
-        ).toLocaleDateString() 
+      (event: GoogleEventHelper) => 
+        event.startDate.toLocaleDateString() 
         === date.toLocaleDateString())
 
   const toggleComplete = (task: GoogleTask) => {
@@ -145,7 +151,7 @@ function App() {
                 item.getDate() === new Date().getDate() ? "text-3xl text-primary" : "")}>{item.getDate()}
 
               </h1>
-              <For each={dayEvents(item)}>
+              <For each={dayEvents(item).sort((e1, e2) => e1.startDate.getTime() - e2.startDate.getTime())}>
                 {(event, _) => (
                   <div 
                     class={clsx(
@@ -158,7 +164,13 @@ function App() {
                         : undefined
                     }}
                   >
-                    <p class="text-base-100 h-fit w-fit">{event.summary}</p>
+                    <p class="text-base-100 h-fit w-3/4">{event.summary}</p>
+                    <p class="text-base-300 h-fit w-1/4 text-right">
+                      {event.startDate.getHours() % 12 || 12}
+                      :
+                      {String(event.startDate.getMinutes()).padStart(2, '0')}
+                      {event.startDate.getHours() >= 12 ? 'p' : 'a'}
+                    </p>
                   </div>
                 )}
               </For>
