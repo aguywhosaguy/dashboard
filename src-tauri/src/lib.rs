@@ -12,7 +12,7 @@ use tauri_specta::{collect_commands, Builder};
 
 use dotenvy::dotenv;
 
-use crate::google::{GoogleClient, GoogleColorList, GoogleEvent};
+use crate::google::{GoogleClient, GoogleColorList, GoogleEvent, GoogleTask, GoogleTasklist};
 
 #[derive(Serialize, specta::Type)]
 struct AppError(String);
@@ -74,11 +74,36 @@ async fn get_colors(app: tauri::AppHandle) -> CmdResult<GoogleColorList> {
     Ok(client.get_colors().await?)
 }
 
+
+#[tauri::command]
+#[specta::specta]
+async fn get_tasklists(app: tauri::AppHandle) -> CmdResult<Vec<GoogleTasklist>> {
+    let client = app.state::<GoogleClient>();
+
+    Ok(client.get_tasklists().await?)
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn get_tasks(app: tauri::AppHandle, tasklist: GoogleTasklist) -> CmdResult<Vec<GoogleTask>> {
+    let client = app.state::<GoogleClient>();
+
+    Ok(client.get_tasks(tasklist).await?)
+}
+
+#[tauri::command]
+#[specta::specta]
+async fn set_task(app: tauri::AppHandle, task: GoogleTask) -> CmdResult<GoogleTask> {
+    let client = app.state::<GoogleClient>();
+
+    Ok(client.set_task(task).await?)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     dotenv().ok();
     let mut builder =
-        Builder::<tauri::Wry>::new().commands(collect_commands![get_rand_photo, get_all_events, get_colors]);
+        Builder::<tauri::Wry>::new().commands(collect_commands![get_rand_photo, get_all_events, get_colors, get_tasklists, get_tasks, set_task]);
 
     builder
         .export(

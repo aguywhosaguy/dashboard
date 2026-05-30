@@ -13,9 +13,41 @@ async getRandPhoto(folder: string) : Promise<Result<string, AppError>> {
     else return { status: "error", error: e  as any };
 }
 },
-async getEvents(calendar: string) : Promise<Result<GoogleEventList, AppError>> {
+async getAllEvents() : Promise<Result<GoogleEvent[], AppError>> {
     try {
-    return { status: "ok", data: await TAURI_INVOKE("get_events", { calendar }) };
+    return { status: "ok", data: await TAURI_INVOKE("get_all_events") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getColors() : Promise<Result<GoogleColorList, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_colors") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getTasklists() : Promise<Result<GoogleTasklist[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_tasklists") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async getTasks(tasklist: GoogleTasklist) : Promise<Result<GoogleTask[], AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_tasks", { tasklist }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async setTask(task: GoogleTask) : Promise<Result<GoogleTask, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("set_task", { task }) };
 } catch (e) {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
@@ -34,9 +66,13 @@ async getEvents(calendar: string) : Promise<Result<GoogleEventList, AppError>> {
 /** user-defined types **/
 
 export type AppError = string
+export type GoogleColor = { background: string; foreground: string }
+export type GoogleColorList = { calendar: Partial<{ [key in string]: GoogleColor }>; event: Partial<{ [key in string]: GoogleColor }> }
 export type GoogleDate = { date: string | null; dateTime: string | null }
-export type GoogleEvent = { summary: string; description: string | null; id: string; start: GoogleDate; end: GoogleDate; htmlLink: string }
-export type GoogleEventList = { items: GoogleEvent[] }
+export type GoogleEvent = { summary: string; description: string | null; id: string; start: GoogleDate; end: GoogleDate; htmlLink: string; colorId: string | null }
+export type GoogleTask = { id: string; title: string; status: GoogleTaskStatus; selfLink: string }
+export type GoogleTaskStatus = "needsAction" | "completed"
+export type GoogleTasklist = { title: string; id: string }
 
 /** tauri-specta globals **/
 

@@ -1,37 +1,62 @@
-import { createSignal, For, onCleanup, onMount } from "solid-js";
+import { createEffect, createResource, createSignal, For, onCleanup, onMount } from "solid-js";
 import clsx from "clsx";
-import { commands, GoogleEvent } from "./bindings";
+import { commands, GoogleColorList, GoogleEvent, GoogleTask, GoogleTasklist } from "./bindings";
 import "./App.css";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { createStore } from "solid-js/store";
 
 function App() {
-  const CALENDAR = "primary"
-
   const [path, setPath] = createSignal("");
 
+  const [colors, setColors] = createSignal<GoogleColorList>();
+
   const [events, setEvents] = createSignal<GoogleEvent[]>([]);
+
+  const [tasklists, setTasklists] = createSignal<GoogleTasklist[]>([])
+
+  const [tasklist, setTasklist] = createSignal<GoogleTasklist>()
+
+  const [tasks, setTasks] = createStore<GoogleTask[]>([])
+
+  const handles: Record<string, () => Promise<void>> = {
+    'p': refreshWallpaper,
+    'r': refreshEvents,
+  }
+
+  const handler = (e: KeyboardEvent) => {
+    if (handles[e.key]) {
+      handles[e.key]()
+    }
+  }
 
   onMount(async () => {
     refreshWallpaper()
 
     refreshEvents()
 
-    const handles: Record<string, () => Promise<void>> = {
-      'p': refreshWallpaper,
-      'r': refreshEvents,
-    }
+    refreshTasklists()
 
-    const handler = (e: KeyboardEvent) => {
-      if (handles[e.key]) {
-        handles[e.key]()
-      }
-    }
+    const color = await commands.getColors()
+
+    color.status === 'ok' && setColors(color.data)
+
+    const tasklist = await commands.getTasklists()
+
+    tasklist.status === 'ok' && setTasklists(tasklist.data)
 
     window.addEventListener("keydown", handler)
 
-    onCleanup(() => window.removeEventListener("keydown", handler))
   })
 
+  onCleanup(() => window.removeEventListener("keydown", handler))
+
+  const [rawTasks] = createResource(tasklist, async (list) => {
+    const task = await commands.getTasks(list)
+
+    return task.status === 'ok' ? setTasks(task.data) : setTasks([]) 
+  })
+
+  createEffect(() => {rawTasks() && setTasks(rawTasks()!)})
 
   function getCurrentWeekDates(): Date[] {
     const now = new Date();
@@ -47,14 +72,27 @@ function App() {
   }
 
  async function refreshEvents() {
-    const vents = await commands.getEvents(CALENDAR);
+    const vents = await commands.getAllEvents();
 
     if (vents.status === 'error') {
       console.error(vents.error)
       return
     }
 
-    setEvents(vents.data.items)
+    setEvents(vents.data)
+  }
+
+ async function refreshTasklists() {
+    const tlists = await commands.getTasklists();
+
+    if (tlists.status === 'error') {
+      console.error(tlists.error)
+      return
+    }
+
+    setTasklists(tlists.data)
+
+    setTasklist(tlists.data[0])
   }
 
   async function refreshWallpaper() {
@@ -79,6 +117,19 @@ function App() {
             ?? 2000
         ).toLocaleDateString() 
         === date.toLocaleDateString())
+
+  const toggleComplete = (task: GoogleTask) => {
+    const status = task.status === 'completed' ? task.status = 'needsAction' : task.status = 'completed'
+
+
+    setTasks(
+      t => t.id === task.id,
+      'status',
+      status
+    )
+
+    commands.setTask({...task, status: status})
+  }
   
   return (
     <main class="flex flex-col w-screen h-screen bg-base-100" data-theme="synthwave">
@@ -86,13 +137,27 @@ function App() {
         <For each={getCurrentWeekDates()}>
           {(item, _) => (
             <div class={clsx( 
-              "flex flex-col align-middle border h-full grow p-2 w-0",
+              "flex flex-col overflow-y-auto align-middle border h-full grow p-2 w-0",
               item.getDate() === new Date().getDate() ? "border-primary border-2" : ""
             )}>
-              <p class={clsx("text-2xl h-1/5 justify-start", item.getDate() === new Date().getDate() ? "text-3xl text-primary" : "")}>{item.getDate()}</p>
+              <h1 class={clsx(
+                "flex items-center text-2xl h-1/5 justify-start shrink-0", 
+                item.getDate() === new Date().getDate() ? "text-3xl text-primary" : "")}>{item.getDate()}
+
+              </h1>
               <For each={dayEvents(item)}>
                 {(event, _) => (
-                  <div class="flex items-center p-2 h-8 w-full bg-base-content rounded-md">
+                  <div 
+                    class={clsx(
+                      "flex items-center p-2 mb-1 h-8 w-full bg-base-content rounded-md",
+                      event.colorId ? '' : 'bg-base-content'
+                    )}
+                    style={{
+                      "background-color": event.colorId
+                        ? colors()?.event[event.colorId]?.background
+                        : undefined
+                    }}
+                  >
                     <p class="text-base-100 h-fit w-fit">{event.summary}</p>
                   </div>
                 )}
@@ -102,10 +167,37 @@ function App() {
         </For>
       </div>
       <div class="flex h-3/4 full">
-        <div class="h-full w-1/4 border">
-          Taskas 
+        <div class="h-full w-1/4 p-2 flex flex-col border">
+          <button class="text-6xl underline dropdown mb-8" popovertarget="tasklists" style={{"anchor-name": '--tasklist-anchor'}}>
+            {tasklist()?.title}
+          </button>
+          <ul class="dropdown menu bg-base-200 rounded-box shadow-sm"
+          popover
+          id="tasklists"
+          style={{"position-anchor": '--tasklist-anchor'}}
+          >
+            <For each={tasklists()}>
+              {(task: GoogleTasklist) => <li><a onClick={() => setTasklist(task)}>{task.title}</a></li>}
+            </For>
+          </ul>
+          <ul class="flex flex-col space-y-3 overflow-scroll">
+            <For each={tasks}>
+              {(task: GoogleTask) => 
+              (
+                <li class="flex ml-4 items-center py-1">
+                  <input 
+                    type="checkbox" 
+                    class="mr-4 checkbox checkbox-primary"
+                    checked={task.status === 'completed'} 
+                    onChange={(e) => toggleComplete(task)}
+                  />
+                  <p class={clsx('text-xl text-primary strikethrough', task.status === 'completed' ? 'struck' : '')} >{task.title}</p>
+                </li>
+              )}
+            </For>
+          </ul>
         </div> 
-        <div class="flex-col h-full grow border">
+        <div class="flex-col h-full w-2/4 border">
           <div class="flex h-2/3 aspect-video mx-auto">
             <img class="h-full w-full" src={path()} />
           </div> 

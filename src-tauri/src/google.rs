@@ -4,8 +4,8 @@ use reqwest::{Client, Method, RequestBuilder};
 use serde::{Serialize, Deserialize};
 use specta::Type;
 use tokio::sync::OnceCell;
-use std::time::{Duration, Instant};
-use tauri::async_runtime::RwLock;
+use std::{time::{Duration, Instant}};
+use tauri::{async_runtime::RwLock, http::response};
 use std::collections::HashMap;
 
 #[derive(Deserialize)]
@@ -71,6 +71,37 @@ pub struct GoogleColorList {
     pub event: HashMap<String, GoogleColor>,
 }
 
+#[derive(Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
+pub enum GoogleTaskStatus {
+    NeedsAction,
+    Completed,
+}
+
+#[derive(Serialize, Deserialize, Type)]
+pub struct GoogleTask {
+    pub id: String,
+    pub title: String,
+    pub status: GoogleTaskStatus,
+    pub selfLink: String,
+}
+
+#[derive(Serialize, Deserialize, Type)]
+pub struct GoogleTasks {
+    pub items: Vec<GoogleTask>,
+}
+
+#[derive(Serialize, Deserialize, Type, Clone)]
+pub struct GoogleTasklist {
+    pub title: String,
+    pub id: String,
+}
+
+#[derive(Serialize, Deserialize, Type, Clone)]
+pub struct GoogleTasklists {
+    pub items: Vec<GoogleTasklist>,
+}
+
 pub struct GoogleClient {
     client: Client,
     client_id: String,
@@ -78,6 +109,7 @@ pub struct GoogleClient {
     refresh_token: String,
     token_cache: RwLock<Option<CachedToken>>,
     colors: tokio::sync::OnceCell<GoogleColorList>,
+    tasklists: tokio::sync::OnceCell<Vec<GoogleTasklist>>
 }
 
 impl GoogleClient {
@@ -95,6 +127,7 @@ impl GoogleClient {
             refresh_token,
             token_cache: RwLock::new(None),
             colors: OnceCell::new(),
+            tasklists: OnceCell::new(),
         })
     }
 
@@ -106,6 +139,7 @@ impl GoogleClient {
             refresh_token,
             token_cache: RwLock::new(None),
             colors: OnceCell::new(),
+            tasklists: OnceCell::new(),
         }
     }
 
@@ -237,5 +271,52 @@ impl GoogleClient {
 
             Ok(colors)
         }).await?.clone())
+    }
+    pub async fn get_tasklists(&self) -> Result<Vec<GoogleTasklist>> {
+        Ok(self.tasklists.get_or_try_init(|| async {
+            let response = self
+                .request(Method::GET, "https://tasks.googleapis.com/tasks/v1/users/@me/lists")
+                .await?
+                .send()
+                .await
+                .context("Failed to get tasklists")?;
+
+            let tasklists: GoogleTasklists = response.json().await.context("Failed to parse tasklists")?;
+
+            Ok(tasklists.items)
+        }).await?.clone())
+    }
+
+    pub async fn get_tasks(&self, tasklist: GoogleTasklist) -> Result<Vec<GoogleTask>> {
+        let response = self
+            .request(
+                Method::GET, 
+                format!("https://tasks.googleapis.com/tasks/v1/lists/{}/tasks", &tasklist.id.as_str()).as_str()
+            )
+            .await?
+            .send()
+            .await
+            .context("Failed to get tasks")?;
+
+        let tasks: GoogleTasks = response.json().await.context("Failed to parse tasks")?;
+
+        Ok(tasks.items)
+    }
+
+    pub async fn set_task(&self, task: GoogleTask) -> Result<GoogleTask> {
+        let response = self
+            .request(
+                Method::PATCH, 
+                &task.selfLink
+            )
+            .await?
+            .body(serde_json::to_string(&task).context("Failed to serialize task")?)
+            .send()
+            .await
+            .context("Failed to update task")?;
+
+        let updated_task: GoogleTask = response.json().await.context("Failed to parse updated task")?;
+
+        Ok(updated_task)
     }
 }
