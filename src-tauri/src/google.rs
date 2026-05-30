@@ -1,8 +1,12 @@
-use anyhow::{Context, Result};
+use anyhow::{Context, Ok, Result};
+use chrono::{Local, Weekday};
 use reqwest::{Client, Method, RequestBuilder};
-use serde::Deserialize;
+use serde::{Serialize, Deserialize};
+use specta::Type;
+use tokio::sync::OnceCell;
 use std::time::{Duration, Instant};
 use tauri::async_runtime::RwLock;
+use std::collections::HashMap;
 
 #[derive(Deserialize)]
 struct TokenResponse {
@@ -22,12 +26,58 @@ impl CachedToken {
     }
 }
 
+#[derive(Serialize, Deserialize, Type)]
+pub struct GoogleDate {
+    date: Option<String>,
+    dateTime: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Type)]
+pub struct GoogleEvent {
+    pub summary: String,
+    pub description: Option<String>,
+    pub id: String,
+    pub start: GoogleDate,
+    pub end: GoogleDate,
+    pub htmlLink: String,
+    pub colorId: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Type)]
+pub struct GoogleCalendar {
+    pub id: String,
+    pub summary: String,
+}
+
+#[derive(Serialize, Deserialize, Type)]
+pub struct GoogleCalendarList {
+    pub items: Vec<GoogleCalendar>,
+}
+
+#[derive(Serialize, Deserialize, Type)]
+pub struct GoogleEventList {
+    pub items: Vec<GoogleEvent>,
+}
+
+#[derive(Serialize, Deserialize, Type, Clone)]
+pub struct GoogleColor {
+    pub background: String,
+    pub foreground: String,
+}
+
+#[derive(Serialize, Deserialize, Type, Clone)]
+pub struct GoogleColorList {
+    pub calendar: HashMap<String, GoogleColor>,
+    pub event: HashMap<String, GoogleColor>,
+}
+
 pub struct GoogleClient {
     client: Client,
     client_id: String,
     client_secret: String,
     refresh_token: String,
     token_cache: RwLock<Option<CachedToken>>,
+    colors: tokio::sync::OnceCell<GoogleColorList>,
 }
 
 impl GoogleClient {
@@ -44,6 +94,7 @@ impl GoogleClient {
             client_secret,
             refresh_token,
             token_cache: RwLock::new(None),
+            colors: OnceCell::new(),
         })
     }
 
@@ -54,6 +105,7 @@ impl GoogleClient {
             client_secret,
             refresh_token,
             token_cache: RwLock::new(None),
+            colors: OnceCell::new(),
         }
     }
 
@@ -111,9 +163,79 @@ impl GoogleClient {
         Ok(access_token)
     }
 
-    pub async fn request(&self, method: Method, url: &str) -> Result<RequestBuilder> {
+    async fn request(&self, method: Method, url: &str) -> Result<RequestBuilder> {
         let token = self.get_token().await?;
 
         Ok(self.client.request(method, url).bearer_auth(token))
+    }
+
+    pub async fn get_events(&self, calendar: &str) -> Result<Vec<GoogleEvent>> {
+
+        let week = Local::now().date_naive().week(Weekday::Sun);
+
+        let sunday: String = week
+            .first_day()
+            .and_hms_opt(0, 0, 0)
+            .context("Failed to calculate start")?
+            .and_local_timezone(Local)
+            .single()
+            .context("Failed to get timezone")?
+            .to_rfc3339();
+
+        let saturday: String = week
+            .last_day()
+            .and_hms_opt(23, 59, 59)
+            .context("Failed to calculate end")?
+            .and_local_timezone(Local)
+            .single()
+            .context("Failed to get timezone")?
+            .to_rfc3339();
+
+        let response = self
+            .request(
+                Method::GET,
+                format!(
+                    "https://www.googleapis.com/calendar/v3/calendars/{}/events",
+                    calendar
+                )
+                .as_str(),
+            )
+            .await?
+            .query(&[("timeMin", sunday), ("timeMax", saturday), ("singleEvents", "true".to_string())])
+            .send()
+            .await
+            .context("Failed to send request")?;
+
+        let events: GoogleEventList = response.json().await.context("Failed to parse response")?;
+
+        Ok(events.items)
+    }
+
+    pub async fn get_calendars(&self) -> Result<Vec<GoogleCalendar>> {
+        let response = self
+            .request(Method::GET, "https://www.googleapis.com/calendar/v3/users/me/calendarList")
+            .await?
+            .send()
+            .await
+            .context("Failed to get calendars")?;
+
+        let calendars: GoogleCalendarList = response.json().await.context("Failed to parse calendar list")?;
+        
+        Ok(calendars.items)
+    }
+
+    pub async fn get_colors(&self) -> Result<GoogleColorList> {
+        Ok(self.colors.get_or_try_init(|| async {
+            let response = self
+                .request(Method::GET, "https://www.googleapis.com/calendar/v3/colors")
+                .await?
+                .send()
+                .await
+                .context("Failed to get colors")?;
+
+            let colors: GoogleColorList = response.json().await.context("Failed to parse color list")?;
+
+            Ok(colors)
+        }).await?.clone())
     }
 }
