@@ -24,13 +24,24 @@
       buildInputs = with pkgs; [
         librsvg
         webkitgtk_4_1
+      ];
+
+      packages = with pkgs; [
         xdg-utils
       ];
 
       shellHook = ''
         export XDG_DATA_DIRS="$GSETTINGS_SCHEMAS_PATH"
         exec zsh
+
+        unset NIX_ENFORCE_PURITY
+        unset NIX_HARDENING_ENABLE
       '';
+
+      NIX_ENFORCE_PURITY = 0;
+
+      hardeningDisable = [ "all" ];
+
     };
   };
 }
