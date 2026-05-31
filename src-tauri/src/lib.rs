@@ -1,6 +1,6 @@
 mod config;
 mod google;
-mod store;
+mod habits;
 
 use anyhow::{anyhow, Context, Result};
 use chrono::{Local, Weekday};
@@ -8,13 +8,14 @@ use rand::seq::IndexedRandom;
 use reqwest::Method;
 use serde::{Deserialize, Serialize};
 use specta_typescript::Typescript;
-use std::fs;
-use tauri::Manager;
+use tokio::time::interval;
+use std::{collections::HashMap, fs, sync::{Arc, Mutex}, time::Duration};
+use tauri::{Emitter, Manager};
 use tauri_specta::{collect_commands, Builder};
 
 use dotenvy::dotenv;
 
-use crate::google::{GoogleClient, GoogleColorList, GoogleEvent, GoogleTask, GoogleTasklist};
+use crate::{google::{GoogleClient, GoogleColorList, GoogleEvent, GoogleTask, GoogleTasklist}, habits::{Habit, HabitList}};
 
 #[derive(Serialize, specta::Type)]
 struct AppError(String);
@@ -102,6 +103,30 @@ async fn set_task(app: tauri::AppHandle, task: GoogleTask) -> CmdResult<GoogleTa
     Ok(client.set_task(task).await?)
 }
 
+#[tauri::command]
+#[specta::specta]
+fn get_habits(app: tauri::AppHandle) -> CmdResult<HashMap<String, Habit>> {
+    let hlist = app.state::<Arc<Mutex<HabitList>>>();
+
+    let mut hlist = hlist.lock().unwrap();
+
+    *hlist = HabitList::get_from_file()?;
+
+    Ok(hlist.clone().habits)
+}
+
+#[tauri::command]
+#[specta::specta]
+fn complete_habit(app: tauri::AppHandle, habit: &str) -> CmdResult<()> {
+    let hlist = app.state::<Arc<Mutex<HabitList>>>();
+
+    let mut hlist = hlist.lock().unwrap();
+
+    hlist.complete(habit);
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     dotenv().ok();
@@ -111,7 +136,9 @@ pub fn run() {
         get_colors,
         get_tasklists,
         get_tasks,
-        set_task
+        set_task,
+        get_habits,
+        complete_habit
     ]);
 
     builder
@@ -122,11 +149,31 @@ pub fn run() {
         .expect("Failed to export typescript bindings");
 
     tauri::Builder::default()
-        .manage(GoogleClient::new(
-            std::env::var("CLIENT_ID").expect("Client ID env var not found"),
-            std::env::var("CLIENT_SECRET").expect("Client secret env var not found"),
-            config::get_config().unwrap().refresh_token,
-        ))
+        .setup(|app| {
+            app.manage(GoogleClient::new(
+                std::env::var("CLIENT_ID").expect("Client ID env var not found"),
+                std::env::var("CLIENT_SECRET").expect("Client secret env var not found"),
+                config::get_config().unwrap().refresh_token,
+            ));
+
+            let mhlist = Arc::new(Mutex::new(HabitList::get_from_file()?));
+            app.manage(mhlist.clone());
+            let spawn_handle = app.handle().clone();
+
+            tauri::async_runtime::spawn(async move {
+                let mut interval = tokio::time::interval(Duration::from_secs(60));
+                loop {
+                    interval.tick().await;
+                    let mut habits = mhlist.lock().unwrap();
+
+                    habits.check_all();
+
+                    spawn_handle.emit("habits-updated", habits.clone().habits).unwrap()
+                }
+            });
+
+            Ok(())
+        })
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(builder.invoke_handler())
         .run(tauri::generate_context!())

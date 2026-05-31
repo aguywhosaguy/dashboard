@@ -52,6 +52,22 @@ async setTask(task: GoogleTask) : Promise<Result<GoogleTask, AppError>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async getHabits() : Promise<Result<Partial<{ [key in string]: Habit }>, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_habits") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async completeHabit(habit: string) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("complete_habit", { habit }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -73,6 +89,8 @@ export type GoogleEvent = { summary: string; description: string | null; id: str
 export type GoogleTask = { id: string; title: string; status: GoogleTaskStatus; selfLink: string }
 export type GoogleTaskStatus = "needsAction" | "completed"
 export type GoogleTasklist = { title: string; id: string }
+export type Habit = { name: string; frequency: HabitFrequency; max: number; amount: number; timestamp: number }
+export type HabitFrequency = "daily" | "weekly"
 
 /** tauri-specta globals **/
 

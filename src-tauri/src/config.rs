@@ -14,7 +14,7 @@ pub struct Config {
 }
 
 pub fn get_config() -> Result<Config> {
-    let proj = ProjectDirs::from("", "", "dashboard").context("Could not find config directory")?;
+    let proj = ProjectDirs::from("com", "henryw", "dashboard").context("Could not find config directory")?;
 
     let cdir = proj.config_dir();
     fs::create_dir_all(cdir).context("Could not create config directory")?;

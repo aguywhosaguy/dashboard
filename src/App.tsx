@@ -1,9 +1,10 @@
-import { createEffect, createResource, createSignal, For, onCleanup, onMount } from "solid-js";
+import { createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import clsx from "clsx";
-import { commands, GoogleColorList, GoogleDate, GoogleEvent, GoogleTask, GoogleTasklist } from "./bindings";
+import { commands, GoogleColorList, GoogleDate, GoogleEvent, GoogleTask, GoogleTasklist, Habit } from "./bindings";
 import "./App.css";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import { createStore } from "solid-js/store";
+import { listen } from "@tauri-apps/api/event";
 
 type GoogleEventHelper = GoogleEvent & {startDate: Date, endDate: Date}
 
@@ -20,9 +21,12 @@ function App() {
 
   const [tasks, setTasks] = createStore<GoogleTask[]>([])
 
+  const [habits, setHabits] = createStore<Record<string, Habit>>()
+
   const handles: Record<string, () => Promise<void>> = {
     'p': refreshWallpaper,
-    'r': refreshEvents,
+    'e': refreshEvents,
+    'h': refreshHabits
   }
 
   const handler = (e: KeyboardEvent) => {
@@ -46,11 +50,19 @@ function App() {
 
     tasklist.status === 'ok' && setTasklists(tasklist.data)
 
+    refreshHabits()
+
+    const habitHandler = await listen<Record<string, Habit>>("habits-updated", (e) => {
+      setHabits(e.payload)
+    })
+
     window.addEventListener("keydown", handler)
 
+    onCleanup(() => habitHandler())
+
+    onCleanup(() => window.removeEventListener("keydown", handler))
   })
 
-  onCleanup(() => window.removeEventListener("keydown", handler))
 
   const [rawTasks] = createResource(tasklist, async (list) => {
     const task = await commands.getTasks(list)
@@ -104,6 +116,19 @@ function App() {
     setTasklist(tlists.data[0])
   }
 
+ async function refreshHabits() {
+    const newHabits = await commands.getHabits();
+
+    console.log(newHabits)
+
+    if (newHabits.status === 'error') {
+      console.error(newHabits.error)
+      return
+    }
+
+    setHabits(newHabits.data)
+  }
+
   async function refreshWallpaper() {
     let path = await commands.getRandPhoto('/home/henryw/wallpapers/');
 
@@ -136,6 +161,16 @@ function App() {
 
     commands.setTask({...task, status: status})
   }
+
+  const completeHabit = (habit: [string, Habit]) => {
+    commands.completeHabit(habit[0])
+
+    setHabits(
+      habit[0],
+      "amount",
+      habit[1].amount + 1
+    )
+  }
   
   return (
     <main class="flex flex-col w-screen h-screen bg-base-100" data-theme="synthwave">
@@ -164,7 +199,7 @@ function App() {
                         : undefined
                     }}
                   >
-                    <p class="text-base-100 h-fit w-3/4">{event.summary}</p>
+                    <p class="text-base-100 h-fit w-3/4 overflow-x-clip">{event.summary}</p>
                     <p class="text-base-300 h-fit w-1/4 text-right">
                       {event.startDate.getHours() % 12 || 12}
                       :
@@ -217,8 +252,20 @@ function App() {
             Waether
           </div>
         </div> 
-        <div class="h-full w-1/4 border">
-          HABITS 
+        <div class="flex flex-col h-full w-1/4 p-2 border">
+          <h1 class="text-6xl text-center mb-8">Habit Tracker</h1>
+          <ul class="flex flex-col space-y-3 overflow-scroll">
+            <For each={Object.entries(habits)}>
+              {(habit: [string, Habit]) => (
+                <Show when={habit[1].amount < habit[1].max}>
+                  <li class="flex ml-4 items-center py-1">
+                    <button class="mr-4 btn btn-neutral" onClick={(e) => completeHabit(habit)}>Complete</button>
+                    <h1 class="text-xl">{habit[1].name}</h1>
+                  </li>
+                </Show>
+              )}
+            </For>
+          </ul>
         </div> 
       </div>
     </main>
