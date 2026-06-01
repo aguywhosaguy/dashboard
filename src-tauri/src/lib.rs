@@ -53,19 +53,20 @@ fn get_rand_photo(folder: &str) -> CmdResult<String> {
 
 #[tauri::command]
 #[specta::specta]
-async fn get_all_events(app: tauri::AppHandle) -> CmdResult<Vec<GoogleEvent>> {
+async fn get_all_events(app: tauri::AppHandle) -> CmdResult<HashMap<String, Vec<GoogleEvent>>> {
     let client = app.state::<GoogleClient>();
 
     let calendars = client.get_calendars().await?;
 
-    let mut events: Vec<GoogleEvent> = Vec::new();
+
+    let mut events: HashMap<String, Vec<GoogleEvent>> = HashMap::new();
 
     for calendar in &calendars {
         let cevents = client
             .get_events(urlencoding::encode(&calendar.id).into_owned().as_str())
             .await?;
 
-        events.extend(cevents);
+        events.insert(calendar.summary.clone(), cevents);
     }
 
     Ok(events)

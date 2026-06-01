@@ -26,8 +26,15 @@ export default function Photo() {
   onCleanup(() => window.removeEventListener("refresh:photo", refreshPhoto))
 
   return (
-    <div class="flex h-2/3 aspect-video mx-auto">
+    <div class="flex h-2/3 w-full mx-auto relative group">
       <img class="h-full w-full" src={path()} />
+      <div class="flex absolute pointer-events-none inset-0 justify-end items-end">
+         <button 
+          class="btn btn-info pointer-events-auto m-2 transition duration-300 opacity-0 group-hover:opacity-100" 
+          onClick={() => refreshPhoto()}>
+            New
+          </button>
+      </div>
     </div> 
   )
 }

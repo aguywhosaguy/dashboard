@@ -1,6 +1,7 @@
 import { Dynamic, Portal } from "solid-js/web"
 import { Refresh, RefreshProps } from "./settings/Refresh"
 import { Component, createSignal } from "solid-js"
+import Filters from "./settings/Filters"
 
 export type SettingsProps = {
   ref: HTMLDialogElement,
@@ -26,6 +27,11 @@ export default function Settings(props: SettingsProps) {
             <li>
               <button onClick={() => setSetting({ component: Refresh, props: props.refreshProps })}>
                 Refresh
+              </button>
+            </li>
+            <li>
+              <button onClick={() => setSetting({ component: Filters, props: {} })}>
+                Filters
               </button>
             </li>
           </ul>

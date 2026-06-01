@@ -1,13 +1,23 @@
 import clsx from "clsx"
 import { createSignal, For, onCleanup, onMount } from "solid-js"
 import { commands, GoogleColorList, GoogleDate, GoogleEvent } from "../bindings"
+import { useSettings } from "../context/SettingsContext";
 
 type GoogleEventHelper = GoogleEvent & {startDate: Date, endDate: Date}
 
 export default function Calendar() {
   const [colors, setColors] = createSignal<GoogleColorList>();
 
-  const [events, setEvents] = createSignal<GoogleEventHelper[]>([]);
+  const [rawEvents, setRawEvents] = createSignal<Record<string, GoogleEventHelper[]>>({});
+
+  const { filters } = useSettings()
+
+  const events = () => {
+    return Object.entries(rawEvents())
+      .filter(([calendar, _]) => filters.get[calendar] === true)
+      .map(([_, events]) => events)
+      .flat()
+  }
 
   async function refreshEvents() {
     const vents = await commands.getAllEvents();
@@ -19,12 +29,19 @@ export default function Calendar() {
 
     const getDate = (date: GoogleDate) => new Date(date.dateTime ?? date.date ?? 2000) 
 
-    setEvents(vents.data.
-      map(event => ({
-        ...event,
-        startDate: getDate(event.start),
-        endDate: getDate(event.end)
-      }))
+    setRawEvents(
+      Object.fromEntries(
+        Object.entries(vents.data)
+          .map(([calendar, eventList]) => [
+            calendar,
+            eventList.map((event: GoogleEvent) => ({
+              ...event,
+              startDate: getDate(event.start),
+              endDate: getDate(event.end)
+            }))
+          ]
+        )
+      )
     )
   }
 
@@ -54,6 +71,13 @@ export default function Calendar() {
     col.status === 'ok' && setColors(col.data)
 
     await refreshEvents()
+
+    filters.set(
+      Object.fromEntries(
+        Object.keys(rawEvents())
+          .map(calendar => [calendar, true])
+      )
+    )
 
     window.addEventListener("refresh:events", refreshEvents)
 

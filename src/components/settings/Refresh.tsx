@@ -11,7 +11,7 @@ export type RefreshProps = {
 
 export function Refresh(props: RefreshProps) {
   return (
-    <ul class="flex flex-col p-1 space-y-4">
+    <ul class="flex flex-col mt-1 p-1 space-y-4">
       <For each={props.refreshers}>
         {(refresh: RefreshFunc) => (
           <li class="flex items-center">

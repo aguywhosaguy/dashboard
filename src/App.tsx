@@ -6,6 +6,7 @@ import Tasks from "./components/Tasks";
 import Habits from "./components/Habits";
 import Photo from "./components/Photo";
 import Weather from "./components/Weather";
+import { SettingProvider } from "./context/SettingsContext";
 
 function App() {
   let settingsRef: HTMLDialogElement;
@@ -24,40 +25,38 @@ function App() {
   })
 
   return (
-    <main class="flex flex-col w-screen h-screen bg-base-100" data-theme="synthwave">
-      <Settings 
-        ref={settingsRef}
-        refreshProps={{
-          refreshers: [
-            {
-              refreshName: 'events',
-              name: 'Calendar'
-            },
-            {
-              refreshName: 'tasks',
-              name: 'Tasks'
-            },
-            {
-              refreshName: 'habits',
-              name: 'Habits'
-            },
-            {
-              refreshName: 'photo',
-              name: 'Photo'
-            }
-          ]
-        }}
-      />
-      <Calendar />
-      <div class="flex h-3/4 full">
-        <Tasks />
-        <div class="flex-col h-full w-2/4 border">
-          <Photo />
-          <Weather />
-        </div> 
-        <Habits />
-      </div>
-    </main>
+    <SettingProvider>
+      <main class="flex flex-col w-screen h-screen bg-base-100" data-theme="synthwave">
+        <Settings 
+          ref={settingsRef}
+          refreshProps={{
+            refreshers: [
+              {
+                refreshName: 'events',
+                name: 'Calendar'
+              },
+              {
+                refreshName: 'tasks',
+                name: 'Tasks'
+              },
+              {
+                refreshName: 'habits',
+                name: 'Habits'
+              }
+            ]
+          }}
+        />
+        <Calendar />
+        <div class="flex h-3/4 full">
+          <Tasks />
+          <div class="flex-col h-full w-2/4 border">
+            <Photo />
+            <Weather />
+          </div> 
+          <Habits />
+        </div>
+      </main>
+    </SettingProvider>
   );
 }
 

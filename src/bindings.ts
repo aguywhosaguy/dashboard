@@ -13,7 +13,7 @@ async getRandPhoto(folder: string) : Promise<Result<string, AppError>> {
     else return { status: "error", error: e  as any };
 }
 },
-async getAllEvents() : Promise<Result<GoogleEvent[], AppError>> {
+async getAllEvents() : Promise<Result<Partial<{ [key in string]: GoogleEvent[] }>, AppError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_all_events") };
 } catch (e) {
