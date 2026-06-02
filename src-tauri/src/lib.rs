@@ -1,6 +1,7 @@
 mod config;
 mod google;
 mod habits;
+mod weather;
 
 use anyhow::{anyhow, Context, Result};
 use chrono::{Local, Weekday};
@@ -15,7 +16,7 @@ use tauri_specta::{collect_commands, Builder};
 
 use dotenvy::dotenv;
 
-use crate::{google::{GoogleClient, GoogleColorList, GoogleEvent, GoogleTask, GoogleTasklist}, habits::{Habit, HabitList}};
+use crate::{google::{GoogleClient, GoogleColorList, GoogleEvent, GoogleTask, GoogleTasklist}, habits::{Habit, HabitList}, weather::{LocationWeather, Weather}};
 
 #[derive(Serialize, specta::Type)]
 struct AppError(String);
@@ -128,6 +129,12 @@ fn complete_habit(app: tauri::AppHandle, habit: &str) -> CmdResult<()> {
     Ok(())
 }
 
+#[tauri::command]
+#[specta::specta]
+async fn get_weather(location: String) -> CmdResult<LocationWeather> {
+    Ok(LocationWeather::from_location(location).await?)
+} 
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     dotenv().ok();
@@ -139,7 +146,8 @@ pub fn run() {
         get_tasks,
         set_task,
         get_habits,
-        complete_habit
+        complete_habit,
+        get_weather
     ]);
 
     builder

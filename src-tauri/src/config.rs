@@ -9,8 +9,7 @@ use anyhow::{Context, Result};
 #[derive(Serialize, Deserialize, Default)]
 pub struct Config {
     pub refresh_token: String,
-    pub longitude: f64,
-    pub latitude: f64,
+    pub weather_key: String
 }
 
 pub fn get_config() -> Result<Config> {

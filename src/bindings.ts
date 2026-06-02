@@ -68,6 +68,14 @@ async completeHabit(habit: string) : Promise<Result<null, AppError>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async getWeather(location: string) : Promise<Result<LocationWeather, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_weather", { location }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -82,6 +90,7 @@ async completeHabit(habit: string) : Promise<Result<null, AppError>> {
 /** user-defined types **/
 
 export type AppError = string
+export type Forecast = { time: [number, number, number]; temperature_2m_max: [number, number, number]; temperature_2m_min: [number, number, number] }
 export type GoogleColor = { background: string; foreground: string }
 export type GoogleColorList = { calendar: Partial<{ [key in string]: GoogleColor }>; event: Partial<{ [key in string]: GoogleColor }> }
 export type GoogleDate = { date: string | null; dateTime: string | null }
@@ -91,6 +100,8 @@ export type GoogleTaskStatus = "needsAction" | "completed"
 export type GoogleTasklist = { title: string; id: string }
 export type Habit = { name: string; frequency: HabitFrequency; max: number; amount: number; timestamp: number }
 export type HabitFrequency = "daily" | "weekly"
+export type LocationWeather = { location: string; current: Weather; daily: Forecast }
+export type Weather = { time: number; interval: number; relative_humidity_2m: number; temperature_2m: number; apparent_temperature: number; is_day: number; precipitation: number; rain: number; weather_code: number; wind_speed_10m: number }
 
 /** tauri-specta globals **/
 
