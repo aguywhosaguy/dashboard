@@ -5,7 +5,7 @@ use serde::{Serialize, Deserialize};
 use specta::Type;
 use tokio::sync::OnceCell;
 use std::{time::{Duration, Instant}};
-use tauri::{async_runtime::RwLock, http::response};
+use tauri::async_runtime::RwLock;
 use std::collections::HashMap;
 
 #[derive(Deserialize)]
@@ -27,20 +27,22 @@ impl CachedToken {
 }
 
 #[derive(Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub struct GoogleDate {
     date: Option<String>,
-    dateTime: Option<String>,
+    date_time: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub struct GoogleEvent {
     pub summary: String,
     pub description: Option<String>,
     pub id: String,
     pub start: GoogleDate,
     pub end: GoogleDate,
-    pub htmlLink: String,
-    pub colorId: Option<String>,
+    pub html_link: String,
+    pub color_id: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Type)]
@@ -79,11 +81,12 @@ pub enum GoogleTaskStatus {
 }
 
 #[derive(Serialize, Deserialize, Type)]
+#[serde(rename_all = "camelCase")]
 pub struct GoogleTask {
     pub id: String,
     pub title: String,
     pub status: GoogleTaskStatus,
-    pub selfLink: String,
+    pub self_link: String,
 }
 
 #[derive(Serialize, Deserialize, Type)]
@@ -113,6 +116,7 @@ pub struct GoogleClient {
 }
 
 impl GoogleClient {
+    #[allow(dead_code)]
     pub fn from_env() -> Result<Self> {
         let client_id = std::env::var("CLIENT_ID").context("Missing client ID")?;
 
@@ -307,7 +311,7 @@ impl GoogleClient {
         let response = self
             .request(
                 Method::PATCH, 
-                &task.selfLink
+                &task.self_link
             )
             .await?
             .body(serde_json::to_string(&task).context("Failed to serialize task")?)

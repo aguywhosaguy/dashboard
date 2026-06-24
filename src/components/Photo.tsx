@@ -1,22 +1,27 @@
-import { commands } from "../bindings";
 import { convertFileSrc } from "@tauri-apps/api/core";
+import { BaseDirectory, join, pictureDir } from "@tauri-apps/api/path";
+import { readDir } from "@tauri-apps/plugin-fs";
 import { createSignal, onCleanup, onMount } from "solid-js";
 
 export default function Photo() {
   const [path, setPath] = createSignal("");
 
   async function refreshPhoto() {
-    let path = await commands.getRandPhoto('/home/henryw/wallpapers/');
+    console.log(BaseDirectory.Picture)
+    const dir = await pictureDir();
+    console.log(dir)
+    const entries = await readDir('.', { baseDir: BaseDirectory.Picture });
 
-    if (path.status === 'error') {
-      console.error(path.error)
-      return
-    }
+    const images = entries.filter(e =>
+      e.isFile && /\.(png|jpe?g|gif|webp)$/i.test(e.name ?? '')
+    );
+    if (!images.length) return;
 
-    setPath(convertFileSrc(path.data))
+    const pick = images[Math.floor(Math.random() * images.length)];
+    const fullPath = await join(dir, pick.name!);
+
+    setPath(convertFileSrc(fullPath)); // ← that's it
   }
-
-
   onMount(async () => {
     await refreshPhoto()
 
@@ -27,7 +32,7 @@ export default function Photo() {
 
   return (
     <div class="flex h-2/3 w-full mx-auto relative group">
-      <img class="h-full w-full" src={path()} />
+      <img class="h-full aspect-video object-cover" src={path()} />
       <div class="flex absolute pointer-events-none inset-0 justify-end items-end">
          <button 
           class="btn btn-info pointer-events-auto m-2 transition duration-300 opacity-0 group-hover:opacity-100" 

@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use directories::ProjectDirs;
 
-use std::{fs, path::PathBuf};
+use std::fs;
 
 use anyhow::{Context, Result};
 

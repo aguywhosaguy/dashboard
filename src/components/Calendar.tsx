@@ -102,7 +102,7 @@ export default function Calendar() {
               {(event, _) => (
                 <div 
                   class={clsx(
-                    "flex items-center p-2 mb-1 h-8 w-full bg-base-content rounded-md",
+                    "flex items-center p-2 mb-1 h-8 w-full group bg-base-content rounded-md",
                     event.colorId ? '' : 'bg-base-content'
                   )}
                   style={{
@@ -111,12 +111,18 @@ export default function Calendar() {
                       : undefined
                   }}
                 >
-                  <p class="text-base-100 h-fit w-3/4 overflow-x-clip">{event.summary}</p>
-                  <p class="text-base-300 h-fit w-1/4 text-right">
+                  <p class="text-base-100 h-fit w-5/12 group-hover:w-full line-clamp-1">{event.summary}</p>
+                  <p class="text-base-300 h-fit w-7/12 group-hover:hidden text-right">
                     {event.startDate.getHours() % 12 || 12}
                     :
                     {String(event.startDate.getMinutes()).padStart(2, '0')}
                     {event.startDate.getHours() >= 12 ? 'p' : 'a'}
+                    {' '}
+                     - 
+                    {event.endDate.getHours() % 12 || 12}
+                    :
+                    {String(event.endDate.getMinutes()).padStart(2, '0')}
+                    {event.endDate.getHours() >= 12 ? 'p' : 'a'}
                   </p>
                 </div>
               )}

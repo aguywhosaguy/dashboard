@@ -3,20 +3,19 @@ mod google;
 mod habits;
 mod weather;
 
-use anyhow::{anyhow, Context, Result};
-use chrono::{Local, Weekday};
+use anyhow::{Context, Result};
 use rand::seq::IndexedRandom;
-use reqwest::Method;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use specta_typescript::Typescript;
-use tokio::time::interval;
 use std::{collections::HashMap, fs, sync::{Arc, Mutex}, time::Duration};
 use tauri::{Emitter, Manager};
 use tauri_specta::{collect_commands, Builder};
 
 use dotenvy::dotenv;
 
-use crate::{google::{GoogleClient, GoogleColorList, GoogleEvent, GoogleTask, GoogleTasklist}, habits::{Habit, HabitList}, weather::{LocationWeather, Weather}};
+use crate::google::{GoogleClient, GoogleColorList, GoogleEvent, GoogleTask, GoogleTasklist}; 
+use crate::habits::{Habit, HabitList, HabitLogs};
+use crate::weather::LocationWeather;
 
 #[derive(Serialize, specta::Type)]
 struct AppError(String);
@@ -124,7 +123,7 @@ fn complete_habit(app: tauri::AppHandle, habit: &str) -> CmdResult<()> {
 
     let mut hlist = hlist.lock().unwrap();
 
-    hlist.complete(habit);
+    let _ = hlist.complete(habit)?;
 
     Ok(())
 }
@@ -135,10 +134,16 @@ async fn get_weather(location: String) -> CmdResult<LocationWeather> {
     Ok(LocationWeather::from_location(location).await?)
 } 
 
+#[tauri::command]
+#[specta::specta]
+async fn get_habit_history() -> CmdResult<HabitLogs> {
+    Ok(HabitLogs::get_from_file()?)
+} 
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     dotenv().ok();
-    let mut builder = Builder::<tauri::Wry>::new().commands(collect_commands![
+    let builder = Builder::<tauri::Wry>::new().commands(collect_commands![
         get_rand_photo,
         get_all_events,
         get_colors,
@@ -147,21 +152,23 @@ pub fn run() {
         set_task,
         get_habits,
         complete_habit,
-        get_weather
+        get_weather,
+        get_habit_history
     ]);
 
+    #[cfg(debug_assertions)]
     builder
         .export(
             Typescript::default(),
-            "/home/henryw/projects/dashboard/src/bindings.ts",
+            "../../src/bindings.ts",
         )
         .expect("Failed to export typescript bindings");
 
     tauri::Builder::default()
         .setup(|app| {
             app.manage(GoogleClient::new(
-                std::env::var("CLIENT_ID").expect("Client ID env var not found"),
-                std::env::var("CLIENT_SECRET").expect("Client secret env var not found"),
+                std::env::var("CLIENT_ID").unwrap_or_default(),
+                std::env::var("CLIENT_SECRET").unwrap_or_default(),
                 config::get_config().unwrap().refresh_token,
             ));
 
@@ -184,6 +191,7 @@ pub fn run() {
             Ok(())
         })
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_fs::init())
         .invoke_handler(builder.invoke_handler())
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

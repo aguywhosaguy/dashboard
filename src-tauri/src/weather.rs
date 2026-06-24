@@ -1,10 +1,7 @@
-use std::thread::current;
-
 use anyhow::{Context, Result};
 use serde::{Serialize, Deserialize};
 
 use specta::Type;
-use tauri::http::response;
 
 use crate::config::get_config;
 
@@ -51,6 +48,7 @@ pub struct Geocode {
 
 
 impl LocationWeather {
+    #[allow(dead_code)]
     pub async fn from_lat_long(latitude: f32, longitude: f32) -> Result<Self> {
         let response = reqwest::Client::new()
             .request(

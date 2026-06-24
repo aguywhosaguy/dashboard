@@ -57,7 +57,7 @@ export default function Tasks() {
 
   return (
     <div class="h-full w-1/4 p-2 flex flex-col border">
-      <button class="text-6xl underline dropdown mb-8" popovertarget="tasklists" style={{"anchor-name": '--tasklist-anchor'}}>
+      <button class="text-6xl underline dropdown mb-8 mt-4" popovertarget="tasklists" style={{"anchor-name": '--tasklist-anchor'}}>
         {tasklist()?.title}
       </button>
       <ul class="dropdown menu bg-base-200 rounded-box shadow-sm"
