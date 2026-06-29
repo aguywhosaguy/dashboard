@@ -59,7 +59,7 @@ impl LocationWeather {
                 ("lat", latitude.to_string()),
                 ("lon", longitude.to_string()),
                 ("limit", "1".to_string()),
-                ("appid", get_config()?.weather_key)
+                ("appid", get_config()?.private.weather_key)
             ])
             .send()
             .await
@@ -88,7 +88,7 @@ impl LocationWeather {
             .query(&[
                 ("q", location),
                 ("limit", "1".to_string()),
-                ("appid", get_config()?.weather_key)
+                ("appid", get_config()?.private.weather_key)
             ])
             .send()
             .await

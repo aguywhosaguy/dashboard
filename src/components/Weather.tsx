@@ -1,22 +1,23 @@
-import { createSignal, For, onCleanup, onMount, Show } from "solid-js"
+import { createEffect, createSignal, For, on, onCleanup, onMount, Show } from "solid-js"
 import weatherImages from "../weatherimages.json"
 import { commands, LocationWeather } from "../bindings"
+import { useSettings } from "../context/SettingsContext"
 
 export default function WeatherModule() {
+  const { config } = useSettings()
+
   const [weather, setWeather] = createSignal<LocationWeather>()
 
   const [time, setTime] = createSignal<Date>(new Date())
   
   onMount(() => {
-    refreshWeather()
-
     const interval = setInterval(() => setTime(new Date()), 100)
     
     onCleanup(() => clearInterval(interval))
   })
 
-  async function refreshWeather() {
-    const newWeather = await commands.getWeather("Maplewood,MO,US")
+  createEffect(on(() => (config.get.location), async() => {
+    const newWeather = await commands.getWeather(config.get.location)
 
     if (newWeather.status === 'error') {
       console.error(newWeather.error)
@@ -24,7 +25,7 @@ export default function WeatherModule() {
     }
 
     setWeather(newWeather.data)
-  }
+  }))
 
   const weatherInfo = () => {
     const code = weather()?.current.weather_code

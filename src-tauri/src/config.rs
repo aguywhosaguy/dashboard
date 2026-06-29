@@ -6,10 +6,21 @@ use std::fs;
 
 use anyhow::{Context, Result};
 
-#[derive(Serialize, Deserialize, Default)]
-pub struct Config {
-    pub refresh_token: String,
+#[derive(specta::Type, Serialize, Deserialize, Default)]
+pub struct PrivateConfig {
     pub weather_key: String
+}
+
+#[derive(specta::Type, Serialize, Deserialize, Default)]
+pub struct PublicConfig {
+    pub location: String,
+    pub refresh_token: String,
+}
+
+#[derive(specta::Type, Serialize, Deserialize, Default)]
+pub struct Config {
+    pub public: PublicConfig,
+    pub private: PrivateConfig
 }
 
 pub fn get_config() -> Result<Config> {
@@ -40,5 +51,23 @@ pub fn get_config() -> Result<Config> {
     let config: Config = toml::from_str(&contents).context("Config file was not valid toml")?;
 
     Ok(config)
+}
+
+pub fn update_config(pconfig: PublicConfig) -> Result<()> {
+    let mut config = get_config()?;
+
+    config.public = pconfig;
+
+    
+    let proj = ProjectDirs::from("com", "henryw", "dashboard").context("Could not find config directory")?;
+
+    let cdir = proj.config_dir();
+    let cfile = cdir.join("config.toml");
+    
+    let toml_string = toml::to_string_pretty(&config).context("Failed to serialize new config")?;
+
+    fs::write(&cfile, toml_string).context("Failed to write new config")?;
+
+    Ok(())
 }
 

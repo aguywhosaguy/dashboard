@@ -5,14 +5,6 @@
 
 
 export const commands = {
-async getRandPhoto(folder: string) : Promise<Result<string, AppError>> {
-    try {
-    return { status: "ok", data: await TAURI_INVOKE("get_rand_photo", { folder }) };
-} catch (e) {
-    if(e instanceof Error) throw e;
-    else return { status: "error", error: e  as any };
-}
-},
 async getAllEvents() : Promise<Result<Partial<{ [key in string]: GoogleEvent[] }>, AppError>> {
     try {
     return { status: "ok", data: await TAURI_INVOKE("get_all_events") };
@@ -84,6 +76,22 @@ async getHabitHistory() : Promise<Result<HabitLogs, AppError>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async getConfig() : Promise<Result<PublicConfig, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("get_config") };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
+},
+async updateConfig(pconfig: PublicConfig) : Promise<Result<null, AppError>> {
+    try {
+    return { status: "ok", data: await TAURI_INVOKE("update_config", { pconfig }) };
+} catch (e) {
+    if(e instanceof Error) throw e;
+    else return { status: "error", error: e  as any };
+}
 }
 }
 
@@ -111,6 +119,7 @@ export type HabitFrequency = "daily" | "weekly"
 export type HabitLogs = { daily: Partial<{ [key in number]: Partial<{ [key in string]: Log }> }>; weekly: Partial<{ [key in number]: Partial<{ [key in string]: Log }> }> }
 export type LocationWeather = { location: string; current: Weather; daily: Forecast }
 export type Log = { count: number; max: number }
+export type PublicConfig = { location: string; refresh_token: string }
 export type Weather = { time: number; interval: number; relative_humidity_2m: number; temperature_2m: number; apparent_temperature: number; is_day: number; precipitation: number; rain: number; weather_code: number; wind_speed_10m: number }
 
 /** tauri-specta globals **/

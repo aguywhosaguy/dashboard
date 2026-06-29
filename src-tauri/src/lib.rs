@@ -3,17 +3,16 @@ mod google;
 mod habits;
 mod weather;
 
-use anyhow::{Context, Result};
-use rand::seq::IndexedRandom;
+use anyhow::Result;
 use serde::Serialize;
 use specta_typescript::Typescript;
-use std::{collections::HashMap, fs, sync::{Arc, Mutex}, time::Duration};
+use std::{collections::HashMap, sync::{Arc, Mutex}, time::Duration};
 use tauri::{Emitter, Manager};
 use tauri_specta::{collect_commands, Builder};
 
 use dotenvy::dotenv;
 
-use crate::google::{GoogleClient, GoogleColorList, GoogleEvent, GoogleTask, GoogleTasklist}; 
+use crate::{config::PublicConfig, google::{GoogleClient, GoogleColorList, GoogleEvent, GoogleTask, GoogleTasklist}}; 
 use crate::habits::{Habit, HabitList, HabitLogs};
 use crate::weather::LocationWeather;
 
@@ -27,29 +26,6 @@ impl From<anyhow::Error> for AppError {
 }
 
 type CmdResult<T> = Result<T, AppError>;
-
-#[tauri::command]
-#[specta::specta]
-fn get_rand_photo(folder: &str) -> CmdResult<String> {
-    let entries: Vec<_> = fs::read_dir(folder)
-        .context("Failed to read dir")?
-        .filter_map(|e| {
-            let path = e.ok()?.path();
-            let ext = path.extension()?.to_str()?.to_lowercase();
-            if ["jpg", "jpeg", "png", "webp"].contains(&ext.as_str()) {
-                Some(path.to_str()?.to_string())
-            } else {
-                None
-            }
-        })
-        .collect();
-
-    entries
-        .choose(&mut rand::rng())
-        .cloned()
-        .ok_or_else(|| anyhow::anyhow!("no images found"))
-        .map_err(AppError::from)
-}
 
 #[tauri::command]
 #[specta::specta]
@@ -140,11 +116,22 @@ async fn get_habit_history() -> CmdResult<HabitLogs> {
     Ok(HabitLogs::get_from_file()?)
 } 
 
+#[tauri::command]
+#[specta::specta]
+fn get_config() -> CmdResult<PublicConfig> {
+    Ok(config::get_config()?.public)
+}
+
+#[tauri::command]
+#[specta::specta]
+fn update_config(pconfig: PublicConfig) -> CmdResult<()> {
+    Ok(config::update_config(pconfig)?)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     dotenv().ok();
-    let builder = Builder::<tauri::Wry>::new().commands(collect_commands![
-        get_rand_photo,
+    let mut builder = Builder::<tauri::Wry>::new().commands(collect_commands![
         get_all_events,
         get_colors,
         get_tasklists,
@@ -153,14 +140,16 @@ pub fn run() {
         get_habits,
         complete_habit,
         get_weather,
-        get_habit_history
+        get_habit_history,
+        get_config,
+        update_config
     ]);
-
+    
     #[cfg(debug_assertions)]
     builder
         .export(
             Typescript::default(),
-            "../../src/bindings.ts",
+            "/home/henryw/projects/dashboard/src/bindings.ts",
         )
         .expect("Failed to export typescript bindings");
 
@@ -169,7 +158,7 @@ pub fn run() {
             app.manage(GoogleClient::new(
                 std::env::var("CLIENT_ID").unwrap_or_default(),
                 std::env::var("CLIENT_SECRET").unwrap_or_default(),
-                config::get_config().unwrap().refresh_token,
+                config::get_config().unwrap().public.refresh_token,
             ));
 
             let mhlist = Arc::new(Mutex::new(HabitList::get_from_file()?));
