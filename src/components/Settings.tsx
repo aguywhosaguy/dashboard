@@ -42,7 +42,7 @@ export default function Settings(props: SettingsProps) {
             </li>
           </ul>
           <div class="divider divider-horizontal"></div>
-          <div>
+          <div class="w-2/3">
             <Dynamic component={setting().component} {...setting().props}>
             
             </Dynamic>

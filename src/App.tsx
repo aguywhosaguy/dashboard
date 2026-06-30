@@ -21,6 +21,8 @@ function App() {
     const handler = (e: KeyboardEvent) => {
       if (e.key == 's') {
         settingsRef!.showModal();
+      } else if (e.key == '`') {
+        commands.quit()
       }
     }
 

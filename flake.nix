@@ -24,6 +24,11 @@
       buildInputs = with pkgs; [
         librsvg
         webkitgtk_4_1
+        xdotool
+        libsoup_3
+        gtk3
+        glib
+        openssl
       ];
 
       packages = with pkgs; [

@@ -92,6 +92,9 @@ async updateConfig(pconfig: PublicConfig) : Promise<Result<null, AppError>> {
     if(e instanceof Error) throw e;
     else return { status: "error", error: e  as any };
 }
+},
+async quit() : Promise<void> {
+    await TAURI_INVOKE("quit");
 }
 }
 

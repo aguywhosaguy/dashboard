@@ -14,21 +14,19 @@ export default function Config() {
   }
   
   return (
-    <fieldset class="flex flex-col p-1 mt-1 space-y-4">
+    <fieldset class="flex flex-col p-1 mt-1 space-y-3">
       <For each={Object.entries(config.get)}>
         {([key, value]) => (
           <div>
-            <div>
-              <legend class="fieldset-legend">
-                {
-                  key.split('_')
-                  .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-                  .join(' ')
-                }
-              </legend>
-            </div>
+            <legend class="fieldset-legend">
+              {
+                key.split('_')
+                .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+                .join(' ')
+              }
+            </legend>
             <div class="join">
-              <input type="text" class="input" placeholder=
+              <input type="text" class="join-item input" placeholder=
                 {
                   key.split('_')
                   .map(word => word.charAt(0).toUpperCase() + word.slice(1))

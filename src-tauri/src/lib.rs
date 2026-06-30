@@ -6,15 +6,22 @@ mod weather;
 use anyhow::Result;
 use serde::Serialize;
 use specta_typescript::Typescript;
-use std::{collections::HashMap, sync::{Arc, Mutex}, time::Duration};
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 use tauri::{Emitter, Manager};
 use tauri_specta::{collect_commands, Builder};
 
 use dotenvy::dotenv;
 
-use crate::{config::PublicConfig, google::{GoogleClient, GoogleColorList, GoogleEvent, GoogleTask, GoogleTasklist}}; 
 use crate::habits::{Habit, HabitList, HabitLogs};
 use crate::weather::LocationWeather;
+use crate::{
+    config::PublicConfig,
+    google::{GoogleClient, GoogleColorList, GoogleEvent, GoogleTask, GoogleTasklist},
+};
 
 #[derive(Serialize, specta::Type)]
 struct AppError(String);
@@ -29,11 +36,16 @@ type CmdResult<T> = Result<T, AppError>;
 
 #[tauri::command]
 #[specta::specta]
+fn quit() {
+    std::process::exit(0);
+}
+
+#[tauri::command]
+#[specta::specta]
 async fn get_all_events(app: tauri::AppHandle) -> CmdResult<HashMap<String, Vec<GoogleEvent>>> {
     let client = app.state::<GoogleClient>();
 
     let calendars = client.get_calendars().await?;
-
 
     let mut events: HashMap<String, Vec<GoogleEvent>> = HashMap::new();
 
@@ -108,13 +120,13 @@ fn complete_habit(app: tauri::AppHandle, habit: &str) -> CmdResult<()> {
 #[specta::specta]
 async fn get_weather(location: String) -> CmdResult<LocationWeather> {
     Ok(LocationWeather::from_location(location).await?)
-} 
+}
 
 #[tauri::command]
 #[specta::specta]
 async fn get_habit_history() -> CmdResult<HabitLogs> {
     Ok(HabitLogs::get_from_file()?)
-} 
+}
 
 #[tauri::command]
 #[specta::specta]
@@ -142,9 +154,10 @@ pub fn run() {
         get_weather,
         get_habit_history,
         get_config,
-        update_config
+        update_config,
+        quit
     ]);
-    
+
     #[cfg(debug_assertions)]
     builder
         .export(
@@ -155,10 +168,12 @@ pub fn run() {
 
     tauri::Builder::default()
         .setup(|app| {
+            let config = config::get_config().unwrap_or_default();
+
             app.manage(GoogleClient::new(
-                std::env::var("CLIENT_ID").unwrap_or_default(),
-                std::env::var("CLIENT_SECRET").unwrap_or_default(),
-                config::get_config().unwrap().public.refresh_token,
+                config.private.client_id,
+                config.private.client_secret,
+                config.public.refresh_token,
             ));
 
             let mhlist = Arc::new(Mutex::new(HabitList::get_from_file()?));
@@ -173,7 +188,9 @@ pub fn run() {
 
                     habits.check_all();
 
-                    spawn_handle.emit("habits-updated", habits.clone().habits).unwrap()
+                    spawn_handle
+                        .emit("habits-updated", habits.clone().habits)
+                        .unwrap()
                 }
             });
 

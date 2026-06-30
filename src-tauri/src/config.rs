@@ -8,7 +8,9 @@ use anyhow::{Context, Result};
 
 #[derive(specta::Type, Serialize, Deserialize, Default)]
 pub struct PrivateConfig {
-    pub weather_key: String
+    pub weather_key: String,
+    pub client_secret: String,
+    pub client_id: String,
 }
 
 #[derive(specta::Type, Serialize, Deserialize, Default)]
@@ -20,7 +22,7 @@ pub struct PublicConfig {
 #[derive(specta::Type, Serialize, Deserialize, Default)]
 pub struct Config {
     pub public: PublicConfig,
-    pub private: PrivateConfig
+    pub private: PrivateConfig,
 }
 
 pub fn get_config() -> Result<Config> {
